@@ -131,9 +131,43 @@ class DySDF(BaseModel):
                 sdf = -sdf
             return sdf
         
+        def _query_color(pts, normals):
+            # pts: Tensor with shape (n_pts, 3). Dtype=float32.
+            pts = pts.view(1, -1, 3).to(frame_id.device)
+            normals = normals.view(1, -1, 3).to(frame_id.device)
+            with torch.inference_mode(False), torch.enable_grad():  # enable gradient for computing gradients
+
+                pts.requires_grad_(True)
+                _deform_codes = self.deform_codes[frame_id] if self.deform_codes is not None else None
+
+                deform_codes = None
+                if _deform_codes is not None:
+                    deform_codes = _deform_codes.view(-1, 1, _deform_codes.shape[-1]).expand(pts.shape[0], pts.shape[1], -1)
+                    
+                ambient_codes = self.ambient_codes[frame_id] if self.ambient_codes is not None else None
+                if ambient_codes is not None:
+                    ambient_codes = ambient_codes.view(-1, 1, ambient_codes.shape[-1]).expand(pts.shape[0], pts.shape[1], -1)
+
+                pts_time = torch.full_like(pts[..., :1], time_step)
+
+                pts_canonical = pts if self.deform_net is None else self.deform_net(deform_codes, pts, self.alpha_ratio, pts_time)
+                hyper_coord = self.hyper_net(deform_codes, pts, pts_time, self.alpha_ratio)
+                    
+                sdf_nn_output = self.sdf_net(pts_canonical, hyper_coord, self.alpha_ratio, input_time=time_step, frame_id=frame_id)
+                sdf, feature_vector = sdf_nn_output[..., :1], sdf_nn_output[..., 1:] # (n_rays, n_samples, 1), (n_rays, n_samples, F)
+                            
+                if self.estimate_normals:
+                    gradients_o =  torch.autograd.grad(outputs=sdf, inputs=pts, grad_outputs=torch.ones_like(sdf, requires_grad=False, device=sdf.device), create_graph=True, retain_graph=True, only_inputs=True)[0]
+                else:
+                    gradients_o = None
+                        
+                color = self.color_net(feature=feature_vector, point=pts_canonical, ambient_code=ambient_codes, view_dir=normals, normal=gradients_o, alpha_ratio=self.alpha_ratio) # n_rays, n_samples, 3
+
+            return color
+        
         bound_min = torch.tensor([-1.0, -1.0, -1.0], dtype=torch.float32)
         bound_max = torch.tensor([ 1.0,  1.0,  1.0], dtype=torch.float32)
-        mesh = extract_geometry(bound_min, bound_max, resolution=resolution, threshold=self.mc_threshold, query_func=_query_sdf)
+        mesh = extract_geometry(bound_min, bound_max, resolution=resolution, threshold=self.mc_threshold, query_func=_query_sdf, query_color=_query_color)
         mesh.export(mesh_path)
         return mesh
 

@@ -194,17 +194,35 @@ def mape_loss(pred, target, reduction='mean'):
     
     return loss
 
-def extract_geometry(bound_min, bound_max, resolution, threshold, query_func):
-    u = extract_fields(bound_min, bound_max, resolution, query_func)
+def extract_geometry(bound_min, bound_max, resolution, threshold, query_func, query_color):
+    u = extract_fields(bound_min, bound_max, resolution, query_func, query_color)
     vertices, triangles = mcubes.marching_cubes(u, threshold)
     b_max_np = bound_max.detach().cpu().numpy()
     b_min_np = bound_min.detach().cpu().numpy()
     if len(vertices) > 0:
-        vertices = vertices / (resolution - 1.0) * (b_max_np - b_min_np)[None, :] + b_min_np[None, :]
-    mesh = trimesh.Trimesh(vertices, triangles)
+        vertices = vertices / (resolution - 1.0) * (b_max_np - b_min_np)[None, :] + b_min_np[None, :] 
+   
+    # Calculate vertex normals
+    vertex_normals = np.zeros(vertices.shape, dtype=np.float32)
+
+    for i in range(len(triangles)):
+        tri = vertices[triangles[i]]
+        normal = np.cross(tri[1] - tri[0], tri[2] - tri[0])
+        vertex_normals[triangles[i]] += normal
+        
+    # Normalize vertex normals
+    vertex_normals /= np.linalg.norm(vertex_normals, axis=1)[:, np.newaxis]
+    
+    vertex = torch.from_numpy(np.array(vertices, dtype=np.float32))
+    vertex_normals = torch.from_numpy(vertex_normals)
+    
+    vertex_colors = query_color(vertex, vertex_normals)
+    col = vertex_colors.detach().cpu().numpy().squeeze(0)
+    
+    mesh = trimesh.Trimesh(vertices, triangles, vertex_colors=col)
     return mesh
 
-def extract_fields(bound_min, bound_max, resolution, query_func):
+def extract_fields(bound_min, bound_max, resolution, query_func, query_color):
     N = 64
     device = bound_max.device
     X = torch.linspace(bound_min[0], bound_max[0], resolution, device=device).split(N)
