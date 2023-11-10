@@ -131,7 +131,7 @@ class DySDF(BaseModel):
                 sdf = -sdf
             return sdf
         
-        def _query_color(pts, normals):
+        def _query_color(pts, pts_normals):
             # pts: Tensor with shape (n_pts, 3). Dtype=float32.
             pts = pts.view(1, -1, 3).to(frame_id.device)
             normals = normals.view(1, -1, 3).to(frame_id.device)
@@ -161,7 +161,7 @@ class DySDF(BaseModel):
                 else:
                     gradients_o = None
                         
-                color = self.color_net(feature=feature_vector, point=pts_canonical, ambient_code=ambient_codes, view_dir=normals, normal=gradients_o, alpha_ratio=self.alpha_ratio) # n_rays, n_samples, 3
+                color = self.color_net(feature=feature_vector, point=pts_canonical, ambient_code=ambient_codes, view_dir=pts_normals, normal=gradients_o, alpha_ratio=self.alpha_ratio)
 
             return color
         

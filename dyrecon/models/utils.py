@@ -195,7 +195,7 @@ def mape_loss(pred, target, reduction='mean'):
     return loss
 
 def extract_geometry(bound_min, bound_max, resolution, threshold, query_func, query_color):
-    u = extract_fields(bound_min, bound_max, resolution, query_func, query_color)
+    u = extract_fields(bound_min, bound_max, resolution, query_func)
     vertices, triangles = mcubes.marching_cubes(u, threshold)
     b_max_np = bound_max.detach().cpu().numpy()
     b_min_np = bound_min.detach().cpu().numpy()
@@ -213,16 +213,16 @@ def extract_geometry(bound_min, bound_max, resolution, threshold, query_func, qu
     # Normalize vertex normals
     vertex_normals /= np.linalg.norm(vertex_normals, axis=1)[:, np.newaxis]
     
-    vertex = torch.from_numpy(np.array(vertices, dtype=np.float32))
+    # Query vertex colors
+    vertex_pts = torch.from_numpy(np.array(vertices, dtype=np.float32))
     vertex_normals = torch.from_numpy(vertex_normals)
+    vertex_colors = query_color(vertex_pts, vertex_normals)
+    colors = vertex_colors.detach().cpu().numpy().squeeze(0)
     
-    vertex_colors = query_color(vertex, vertex_normals)
-    col = vertex_colors.detach().cpu().numpy().squeeze(0)
-    
-    mesh = trimesh.Trimesh(vertices, triangles, vertex_colors=col)
+    mesh = trimesh.Trimesh(vertices, triangles, vertex_colors=colors)
     return mesh
 
-def extract_fields(bound_min, bound_max, resolution, query_func, query_color):
+def extract_fields(bound_min, bound_max, resolution, query_func):
     N = 64
     device = bound_max.device
     X = torch.linspace(bound_min[0], bound_max[0], resolution, device=device).split(N)
