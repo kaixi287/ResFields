@@ -134,7 +134,7 @@ class DySDF(BaseModel):
         def _query_color(pts, pts_normals):
             # pts: Tensor with shape (n_pts, 3). Dtype=float32.
             pts = pts.view(1, -1, 3).to(frame_id.device)
-            normals = normals.view(1, -1, 3).to(frame_id.device)
+            pts_normals = pts_normals.view(1, -1, 3).to(frame_id.device)
             with torch.inference_mode(False), torch.enable_grad():  # enable gradient for computing gradients
 
                 pts.requires_grad_(True)
