@@ -211,7 +211,9 @@ def extract_geometry(bound_min, bound_max, resolution, threshold, query_func, qu
         vertex_normals[triangles[i]] += normal
         
     # Normalize vertex normals
-    vertex_normals /= np.linalg.norm(vertex_normals, axis=1)[:, np.newaxis]
+    magnitude = np.linalg.norm(vertex_normals, axis=1)[:, np.newaxis]
+    if (magnitude > 0):
+        vertex_normals /= np.linalg.norm(vertex_normals, axis=1)[:, np.newaxis]
     
     # Query vertex colors
     vertex_pts = torch.from_numpy(np.array(vertices, dtype=np.float32))
