@@ -33,6 +33,11 @@
 ResField layers incorporate time-dependent weights into MLPs to effectively represent complex temporal signals. 
 </p>
 
+**Note**: This is a modified version of the original [ResFields](https://github.com/markomih/ResFields).
+Modifications are made in the following files to enable the extraction of meshes that carry vertex color information:
+- [dyrecon/models/dysdf.py](dyrecon/models/dysdf.py)
+- [dyrecon/models/utils.py](dyrecon/models/utils.py)
+
 ## Applications
 
 
